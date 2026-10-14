@@ -33,6 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -115,66 +118,75 @@ fun LauncherScreen(
     }
     BackHandler(enabled = moving != null) { moving = null }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Black)
-            .safeDrawingPadding() // no-op on a TV; keeps clear of system bars elsewhere
-            .padding(horizontal = 36.dp, vertical = 20.dp),
-    ) {
-        Box(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterEnd) {
-            Clock()
-        }
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(COLUMNS),
-            state = grid,
-            // Room for the focused Tile to grow without being clipped.
-            contentPadding = PaddingValues(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-            modifier = Modifier
-                .weight(1f)
-                .onPreviewKeyEvent { event ->
-                    // In Move mode the arrows move the Tile instead of the focus, and OK puts it down.
-                    if (movingIndex < 0) return@onPreviewKeyEvent false
-                    val step = when (event.key) {
-                        Key.DirectionLeft -> if (rtl) 1 else -1
-                        Key.DirectionRight -> if (rtl) -1 else 1
-                        Key.DirectionUp -> -COLUMNS
-                        Key.DirectionDown -> COLUMNS
-                        else -> 0
-                    }
-                    when {
-                        step != 0 -> {
-                            if (event.type == KeyEventType.KeyDown) onMove(movingIndex, movingIndex + step)
-                            true
-                        }
-                        event.key in OK_KEYS -> {
-                            if (event.type == KeyEventType.KeyUp) moving = null
-                            true
-                        }
-                        else -> false
-                    }
-                },
+    Box(Modifier.fillMaxSize().background(Black)) {
+        // The Ladrok logo, faint behind the Tiles: there when the screen is empty, quiet when it isn't.
+        Image(
+            painterResource(R.drawable.ladrok_logo),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(Silver),
+            alpha = 0.08f,
+            modifier = Modifier.align(Alignment.Center).fillMaxHeight(0.45f),
+        )
+        Column(
+            Modifier
+                .fillMaxSize()
+                .safeDrawingPadding() // no-op on a TV; keeps clear of system bars elsewhere
+                .padding(horizontal = 36.dp, vertical = 20.dp),
         ) {
-            itemsIndexed(tiles, key = { _, tile -> tile.key }) { index, tile ->
-                val isSettings = tile.key == TileOrder.SETTINGS
-                TileView(
-                    tile = tile,
-                    onClick = { onOpen(tile) },
-                    onLongClick = if (isSettings || moving != null) null else ({ menuFor = tile }),
-                    modifier = Modifier
-                        .then(if (index == 0) Modifier.focusRequester(first) else Modifier)
-                        .onFocusChanged { if (it.hasFocus) focused = tile.key },
-                )
+            Box(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterEnd) {
+                Clock()
             }
-        }
-        val caption = when {
-            movingIndex >= 0 -> stringResource(R.string.move_hint, tiles[movingIndex].label)
-            else -> tiles.firstOrNull { it.key == focused }?.label.orEmpty()
-        }
-        Box(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
-            Text(caption, color = Muted, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("caption"))
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(COLUMNS),
+                state = grid,
+                // Room for the focused Tile to grow without being clipped.
+                contentPadding = PaddingValues(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .onPreviewKeyEvent { event ->
+                        // In Move mode the arrows move the Tile instead of the focus, and OK puts it down.
+                        if (movingIndex < 0) return@onPreviewKeyEvent false
+                        val step = when (event.key) {
+                            Key.DirectionLeft -> if (rtl) 1 else -1
+                            Key.DirectionRight -> if (rtl) -1 else 1
+                            Key.DirectionUp -> -COLUMNS
+                            Key.DirectionDown -> COLUMNS
+                            else -> 0
+                        }
+                        when {
+                            step != 0 -> {
+                                if (event.type == KeyEventType.KeyDown) onMove(movingIndex, movingIndex + step)
+                                true
+                            }
+                            event.key in OK_KEYS -> {
+                                if (event.type == KeyEventType.KeyUp) moving = null
+                                true
+                            }
+                            else -> false
+                        }
+                    },
+            ) {
+                itemsIndexed(tiles, key = { _, tile -> tile.key }) { index, tile ->
+                    val isSettings = tile.key == TileOrder.SETTINGS
+                    TileView(
+                        tile = tile,
+                        onClick = { onOpen(tile) },
+                        onLongClick = if (isSettings || moving != null) null else ({ menuFor = tile }),
+                        modifier = Modifier
+                            .then(if (index == 0) Modifier.focusRequester(first) else Modifier)
+                            .onFocusChanged { if (it.hasFocus) focused = tile.key },
+                    )
+                }
+            }
+            val caption = when {
+                movingIndex >= 0 -> stringResource(R.string.move_hint, tiles[movingIndex].label)
+                else -> tiles.firstOrNull { it.key == focused }?.label.orEmpty()
+            }
+            Box(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+                Text(caption, color = Muted, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("caption"))
+            }
         }
     }
 
