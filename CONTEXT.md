@@ -1,4 +1,4 @@
-# Ladrok Start
+# Ladrok Launcher
 
 The home screen of Ladrok TV: the first thing on screen after boot, from which the viewer opens everything else. It follows the Ladrok mantra: only what you need, nothing that shouts, little to set up.
 
