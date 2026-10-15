@@ -2,6 +2,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Watch Next and Channels, which Apps publish in the TvProvider; posters are often on the web -->
+    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 

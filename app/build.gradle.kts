@@ -67,6 +67,8 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.tv.material)
+    implementation(libs.coil.compose) // Program posters: decoded at the size shown, cached
+    implementation(libs.coil.okhttp)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
