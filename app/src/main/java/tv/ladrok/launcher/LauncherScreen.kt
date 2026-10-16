@@ -566,7 +566,8 @@ private fun Menu(title: String, beside: IntRect?, items: List<Pair<String, () ->
                 .width(320.dp)
                 .background(Raised, RoundedCornerShape(12.dp))
                 .border(1.dp, Line, RoundedCornerShape(12.dp))
-                .padding(8.dp),
+                .padding(8.dp)
+                .ignoreHeldOk(),
         ) {
             Text(
                 title, color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -579,6 +580,23 @@ private fun Menu(title: String, beside: IntRect?, items: List<Pair<String, () ->
         LaunchedEffect(Unit) {
             withFrameNanos {}
             runCatching { first.requestFocus() }
+        }
+    }
+}
+
+/**
+ * Swallows OK (centre, Enter) until it is pressed again inside: the menu opens while OK is still
+ * held, and without this its release (or the key's repeats) would choose the first item.
+ */
+@Composable
+private fun Modifier.ignoreHeldOk(): Modifier {
+    var armed by remember { mutableStateOf(false) }
+    return onPreviewKeyEvent { event ->
+        val ok = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
+        when {
+            !ok -> false
+            event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 -> { armed = true; false }
+            else -> !armed
         }
     }
 }
