@@ -112,7 +112,7 @@ class ChannelChoice(val key: String, val name: String, val shown: Boolean)
  * The Launcher: Watch Next and switched-on Channels on the left, the Keypad on the right, a clock,
  * and the name of whatever has focus. The most recent Watch Next Program is shown large at the top,
  * to continue with one press; with nothing to continue, the left side shows the logo and the time.
- * Long-press OK on a Tile for Move, Channels, Updates (when [onShowInStore] is set) and App info, in a
+ * Long-press OK on a Tile for Move, Channels, Watch Next, Updates (when [onShowInStore] is set) and App info, in a
  * menu beside the Tile; digits 1–9 open the Tile with that digit; Back hops between the rows and the
  * Keypad. [home] goes up each time Home is pressed while the Launcher is already showing.
  */
@@ -134,6 +134,11 @@ fun LauncherScreen(
     continueWith: Program? = Shelves.latest(shelves),
     /** The banner of [continueWith]'s App, when the card shows just the App. */
     continueBanner: ImageBitmap? = null,
+    /** Whether [Tile]'s Watch Next is shown, or null when its App has none to show or hide. */
+    watchNextOf: (Tile) -> Boolean? = { null },
+    onToggleWatchNext: (app: String) -> Unit = {},
+    /** Takes a Program out of Watch Next until it is watched again. */
+    onRemove: (Program) -> Unit = {},
 ) {
     var caption by remember { mutableStateOf("") }
     // Time left in the focused Program, on the right of the caption.
@@ -145,6 +150,8 @@ fun LauncherScreen(
     var focusedTile by remember { mutableIntStateOf(-1) }
     var menuFor by remember { mutableStateOf<Tile?>(null) }
     var channelsFor by remember { mutableStateOf<Tile?>(null) }
+    // A Watch Next Program whose menu (long-press OK) is open.
+    var programMenu by remember { mutableStateOf<Program?>(null) }
     var moving by remember { mutableStateOf<String?>(null) }
     var page by remember { mutableIntStateOf(0) }
     // A cell (0–8) to focus once its page is drawn, and a counter so the same cell can be asked for twice.
@@ -178,6 +185,7 @@ fun LauncherScreen(
         if (!ready) return@LaunchedEffect
         menuFor = null
         channelsFor = null
+        programMenu = null
         moving = null
         if (home > 0 || caption.isEmpty()) {
             page = 0
@@ -265,7 +273,7 @@ fun LauncherScreen(
                 if (!nothing) Clock() // with nothing to continue, the time is large on the left
             }
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(36.dp)) {
-                val menuOpen = menuFor != null || channelsFor != null
+                val menuOpen = menuFor != null || channelsFor != null || programMenu != null
                 Box(Modifier.weight(2f).fillMaxHeight().alpha(if (menuOpen) DIMMED else 1f)) {
                     if (nothing) {
                         // Nothing to continue: the Ladrok logo, faint, and the time.
@@ -299,6 +307,7 @@ fun LauncherScreen(
                                 first = firstProgram,
                                 keypad = cells[0],
                                 onOpen = onOpenProgram,
+                                onLongPress = { programMenu = it },
                                 onFocus = onFocusProgram,
                             )
                         }
@@ -310,6 +319,7 @@ fun LauncherScreen(
                                 first = if (row == 0 && spotlight == null) firstProgram else null,
                                 state = if (row == 0) firstRow else rememberLazyListState(),
                                 onOpen = onOpenProgram,
+                                onLongPress = { programMenu = it },
                                 onFocus = onFocusProgram,
                             )
                         }
@@ -394,10 +404,26 @@ fun LauncherScreen(
                     "${stringResource(R.string.channels)}\t${stringResource(R.string.channels_on, channels.count { it.shown }, channels.size)}" to
                         { menuFor = null; channelsFor = tile }
                 } else null,
+                watchNextOf(tile)?.let { shown ->
+                    "${stringResource(R.string.watch_next)}\t${stringResource(if (shown) R.string.channel_on else R.string.channel_off)}" to
+                        { onToggleWatchNext(tile.key) }
+                },
                 onShowInStore?.let { show ->
                     "${stringResource(R.string.updates)}\t${stringResource(R.string.updates_where)}" to { menuFor = null; show(tile) }
                 },
                 stringResource(R.string.app_info) to { menuFor = null; onAppInfo(tile) },
+            ),
+        )
+    }
+    programMenu?.let { program ->
+        val app = appName(program.app)
+        Menu(
+            title = program.title,
+            beside = null,
+            onDismiss = { programMenu = null },
+            items = listOf(
+                stringResource(R.string.remove) to { programMenu = null; onRemove(program) },
+                stringResource(R.string.hide_app, app) to { programMenu = null; onToggleWatchNext(program.app) },
             ),
         )
     }
@@ -433,6 +459,7 @@ private fun Spotlight(
     first: FocusRequester,
     keypad: FocusRequester,
     onOpen: (Program) -> Unit,
+    onLongPress: (Program) -> Unit,
     onFocus: (Program) -> Unit,
 ) {
     Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -441,6 +468,7 @@ private fun Spotlight(
             width = 340.dp,
             banner = banner,
             onClick = { onOpen(program) },
+            onLongClick = { onLongPress(program) },
             modifier = Modifier
                 .focusRequester(first)
                 .focusProperties { end = keypad } // towards the Keypad: its first Tile, not whichever is level with the card
@@ -468,6 +496,7 @@ private fun ShelfRow(
     first: FocusRequester?,
     state: LazyListState,
     onOpen: (Program) -> Unit,
+    onLongPress: (Program) -> Unit,
     onFocus: (Program) -> Unit,
 ) {
     Column {
@@ -486,6 +515,7 @@ private fun ShelfRow(
                     program = program,
                     width = if (small) 150.dp else 200.dp,
                     onClick = { onOpen(program) },
+                    onLongClick = { onLongPress(program) },
                     modifier = Modifier
                         .then(if (index == 0 && first != null) Modifier.focusRequester(first) else Modifier)
                         .onFocusChanged { if (it.hasFocus) onFocus(program) },
@@ -509,9 +539,18 @@ private fun tileColors() = ClickableSurfaceDefaults.colors(
 )
 
 @Composable
-private fun ProgramCard(program: Program, width: Dp, onClick: () -> Unit, modifier: Modifier, banner: ImageBitmap? = null) {
+private fun ProgramCard(
+    program: Program,
+    width: Dp,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    banner: ImageBitmap? = null,
+    onLongClick: () -> Unit = {},
+) {
     Surface(
         onClick = onClick,
+        // Only Watch Next can be taken out; a Channel is switched off from its App's Tile.
+        onLongClick = if (program.inWatchNext) onLongClick else null,
         modifier = modifier.width(width).aspectRatio(16f / 9f).semantics { contentDescription = program.title.ifEmpty { program.app } },
         shape = ClickableSurfaceDefaults.shape(shape),
         colors = tileColors(),
