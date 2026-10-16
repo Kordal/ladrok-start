@@ -86,3 +86,50 @@ class ShelvesTest {
         assertEquals(24, Shelves.minutesLeft(24 * 60_000L))
     }
 }
+
+class ContinueTest {
+    private fun next(key: String, app: String, at: Long) = Program(key, app, key, poster = null, intentUri = "intent:$key", at = at)
+    private val nuvio = next("ep5", "nuvio", at = 1_000)
+
+    @Test fun `without a visit the most recent in Watch Next continues`() {
+        assertEquals("ep5", Continue.pick(listOf(nuvio), visit = null, playing = null)?.key)
+        assertNull(Continue.pick(emptyList(), visit = null, playing = null))
+    }
+
+    @Test fun `the App visited last wins over an older Watch Next`() {
+        val pick = Continue.pick(listOf(nuvio), Visit("stremio", started = 5_000), playing = null)!!
+        assertEquals("stremio", pick.app)
+        assertEquals(true, pick.onlyApp)
+    }
+
+    @Test fun `what its player was playing shows the title, poster and time left`() {
+        val playing = Playing("stremio", at = 6_000, title = "Dune", poster = "file:///p.jpg", position = 600_000, duration = 3_600_000)
+        val pick = Continue.pick(listOf(nuvio), Visit("stremio", started = 5_000), playing)!!
+        assertEquals("Dune", pick.title)
+        assertEquals("file:///p.jpg", pick.poster)
+        assertEquals(3_000_000L, pick.left)
+        assertEquals(false, pick.onlyApp)
+    }
+
+    @Test fun `a player from before the visit or another App is not used`() {
+        val old = Playing("stremio", at = 4_000, title = "Old", poster = null, position = 0, duration = 0)
+        assertEquals(true, Continue.pick(emptyList(), Visit("stremio", started = 5_000), old)?.onlyApp)
+        val other = Playing("jellyfin", at = 6_000, title = "Other", poster = null, position = 0, duration = 0)
+        assertEquals(true, Continue.pick(emptyList(), Visit("stremio", started = 5_000), other)?.onlyApp)
+    }
+
+    @Test fun `the visited App's own Watch Next has the most to show`() {
+        assertEquals("ep5", Continue.pick(listOf(nuvio), Visit("nuvio", started = 5_000), playing = null)?.key)
+    }
+
+    @Test fun `Watch Next written during the visit wins`() {
+        assertEquals("ep5", Continue.pick(listOf(next("ep5", "nuvio", at = 6_000)), Visit("stremio", started = 5_000), playing = null)?.key)
+    }
+
+    @Test fun `a picked Program outside Watch Next leaves Watch Next whole`() {
+        val pick = Program("app:stremio", "stremio", "", null, null, onlyApp = true)
+        val (spot, rows) = Shelves.spotlight(listOf(Shelf(Shelves.WATCH_NEXT, "Watch Next", listOf(nuvio))), pick)
+        assertEquals("app:stremio", spot?.key)
+        assertEquals(listOf("ep5"), rows.single().programs.map { it.key })
+    }
+}
