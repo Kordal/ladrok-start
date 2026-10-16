@@ -32,7 +32,7 @@ On a stock Android TV device, press Home and pick *Ladrok Launcher*.
 
 ## Releases
 
-Push a tag such as `v1.0.0`. CI builds `LadrokLauncher.apk`, signs it with the release key (repo secrets `LADROK_KEYSTORE_B64` and `LADROK_KEYSTORE_PASSWORD`, key alias `ladrok-launcher`, shared with Ladrok Store) and attaches it with its SHA-256 to a GitHub Release.
+Push a tag such as `v1.0.0`, or run the Release workflow by hand with that version (Actions → Release → Run workflow). CI builds `LadrokLauncher.apk`, signs it with the release key (repo secrets `LADROK_KEYSTORE_B64` and `LADROK_KEYSTORE_PASSWORD`, key alias `ladrok-launcher`, shared with Ladrok Store) and attaches it with its SHA-256 to a GitHub Release.
 
 Nothing to bump in ladrok-tv: its `scripts/fetch-prebuilts.sh` builds the newest release into each system image, and between system updates [Ladrok Store](https://github.com/Kordal/ladrok-store) installs newer releases from its catalog. Both accept only APKs signed with the pinned release certificate; rotating the key means updating `CERT_SHA256` in `fetch-prebuilts.sh` and the Launcher's `signer` in ladrok-store's `catalog/apps.yaml`.
 
