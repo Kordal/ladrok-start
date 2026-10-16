@@ -72,6 +72,24 @@ class Store(context: Context) {
         prefs.edit().putStringSet(CHANNELS, if (key in now) now - key else now + key).apply()
     }
 
+    /** Apps whose Watch Next the viewer turned off (a Tile's menu, or a Program's). */
+    fun hiddenApps(): Set<String> = prefs.getStringSet(HIDDEN_APPS, null).orEmpty()
+
+    fun toggleWatchNext(app: String) {
+        val now = hiddenApps()
+        prefs.edit().putStringSet(HIDDEN_APPS, if (app in now) now - app else now + app).apply()
+    }
+
+    /** Programs the viewer removed from Watch Next ([Program.same]), with when. */
+    fun removed(): Map<String, Long> = prefs.getStringSet(REMOVED, null).orEmpty().mapNotNull { entry ->
+        entry.substringBefore('|').toLongOrNull()?.let { entry.substringAfter('|') to it }
+    }.toMap()
+
+    fun remove(program: Program) {
+        val kept = removed() - program.same + (program.same to System.currentTimeMillis())
+        prefs.edit().putStringSet(REMOVED, kept.map { (same, at) -> "$at|$same" }.takeLast(MAX_REMOVED).toSet()).apply()
+    }
+
     /** Whether the Launcher already asked for the TvProvider permission. It asks only once. */
     var askedPermission: Boolean
         get() = prefs.getBoolean(ASKED, false)
@@ -81,5 +99,8 @@ class Store(context: Context) {
         const val ORDER = "order"
         const val CHANNELS = "channels"
         const val ASKED = "asked_permission"
+        const val HIDDEN_APPS = "watch_next_off"
+        const val REMOVED = "watch_next_removed"
+        const val MAX_REMOVED = 200
     }
 }

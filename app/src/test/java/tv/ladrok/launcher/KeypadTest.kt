@@ -133,3 +133,19 @@ class ContinueTest {
         assertEquals(listOf("ep5"), rows.single().programs.map { it.key })
     }
 }
+
+class WatchNextHidingTest {
+    private fun program(title: String, app: String = "nuvio", at: Long = 1_000) =
+        Program("w$title", app, title, poster = null, intentUri = "intent:$title", at = at)
+
+    @Test fun `an App's Watch Next can be turned off`() {
+        val shown = Shelves.visible(listOf(program("a"), program("b", app = "jellyfin")), hiddenApps = setOf("nuvio"), removed = emptyMap())
+        assertEquals(listOf("b"), shown.map { it.title })
+    }
+
+    @Test fun `a removed Program stays out until watched again`() {
+        val a = program("a", at = 1_000)
+        assertEquals(emptyList<String>(), Shelves.visible(listOf(a), emptySet(), mapOf(a.same to 2_000L)).map { it.title })
+        assertEquals(listOf("a"), Shelves.visible(listOf(program("a", at = 3_000)), emptySet(), mapOf(a.same to 2_000L)).map { it.title })
+    }
+}

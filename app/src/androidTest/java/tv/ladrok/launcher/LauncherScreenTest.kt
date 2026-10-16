@@ -33,6 +33,7 @@ class LauncherScreenTest {
     private var hasStore = false
     /** What [Continue] picked in the app; null for the default, the most recent in Watch Next. */
     private var continueWith: Program? = null
+    private var watchNextOn = true
     private val opened = mutableListOf<String>()
 
     private fun show() = rule.setContent {
@@ -52,6 +53,9 @@ class LauncherScreenTest {
             channelsOf = { emptyList() },
             onToggleChannel = {},
             continueWith = continueWith ?: Shelves.latest(shelves),
+            watchNextOf = { if (it.key == "a") watchNextOn else null },
+            onToggleWatchNext = { opened += "toggle:$it" },
+            onRemove = { opened += "remove:${it.key}" },
         )
     }
 
@@ -188,5 +192,31 @@ class LauncherScreenTest {
         rule.onNodeWithText("Pick up where you left off").assertExists()
         press("stremio", Key.DirectionCenter)
         assertEquals(listOf("app:stremio"), opened)
+    }
+
+    @Test fun aWatchNextProgramCanBeRemovedOrItsAppHidden() {
+        shelves = listOf(Shelf(Shelves.WATCH_NEXT, "Watch Next", listOf(Program("w1", "nuvio", "Criminal Minds", null, "intent:x"))))
+        show()
+        rule.onNodeWithContentDescription("Criminal Minds").performKeyInput {
+            keyDown(Key.DirectionCenter)
+            advanceEventTime(1_000)
+            keyUp(Key.DirectionCenter)
+        }
+        rule.onNodeWithText("Remove").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        rule.onNodeWithText("Hide all from Nuvio").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(listOf("toggle:nuvio"), opened)
+    }
+
+    @Test fun aTilesMenuTurnsItsWatchNextBackOn() {
+        watchNextOn = false
+        show()
+        rule.onNodeWithContentDescription("Alpha").performKeyInput {
+            keyDown(Key.DirectionCenter)
+            advanceEventTime(1_000)
+            keyUp(Key.DirectionCenter)
+        }
+        rule.onNodeWithText("Move").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        rule.onNodeWithText("Watch Next").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(listOf("toggle:a"), opened)
     }
 }

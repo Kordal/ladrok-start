@@ -36,7 +36,11 @@ class Program(
     val at: Long? = null,
     /** Nothing known but the App: shown with the App's banner, opens the App. */
     val onlyApp: Boolean = false,
-)
+) {
+    /** The same Program across App updates, which may rewrite its row: its App and link (or title). */
+    val same get() = "$app\n${intentUri ?: title}"
+    val inWatchNext get() = key.startsWith("w")
+}
 
 /** One row on the left: Watch Next, or a Channel the viewer switched on. [app]: the Channel's App. */
 class Shelf(val key: String, val title: String, val programs: List<Program>, val app: String? = null)
@@ -59,6 +63,13 @@ object Shelves {
         }
         return pick to rest.filter { it.programs.isNotEmpty() }
     }
+
+    /**
+     * Watch Next without what the viewer took out: every Program of [hiddenApps], and each one in
+     * [removed] (by [Program.same], with when) until it is watched again after that.
+     */
+    fun visible(watchNext: List<Program>, hiddenApps: Set<String>, removed: Map<String, Long>): List<Program> =
+        watchNext.filter { it.app !in hiddenApps && removed[it.same].let { at -> at == null || (it.at ?: 0) > at } }
 
     /** Whole minutes still to watch, rounded up so the last seconds still read "1 min". */
     fun minutesLeft(left: Long): Long = (left + 59_999) / 60_000

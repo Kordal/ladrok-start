@@ -43,6 +43,9 @@ class LauncherActivity : ComponentActivity() {
     private val banner = mutableStateOf<ImageBitmap?>(null)
     private val channels = mutableStateOf<List<TvData.Channel>>(emptyList())
     private val shownChannels = mutableStateOf<Set<String>>(emptySet())
+    /** Apps with Programs in Watch Next, shown or not, for the Watch Next item in their Tile's menu. */
+    private val watchNextApps = mutableStateOf<Set<String>>(emptySet())
+    private val hiddenApps = mutableStateOf<Set<String>>(emptySet())
     private val home = mutableIntStateOf(0)
     /** Whether Ladrok Store is here to show an App's page; read with the Apps. */
     private val hasStore = mutableStateOf(false)
@@ -67,6 +70,7 @@ class LauncherActivity : ComponentActivity() {
         players = Players(this, recent) { reload(after = 500) }
         players.start()
         shownChannels.value = store.channels()
+        hiddenApps.value = store.hiddenApps()
         onBackPressedDispatcher.addCallback(this) {} // Back on the home screen goes nowhere
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
@@ -107,6 +111,22 @@ class LauncherActivity : ComponentActivity() {
                     shownChannels.value = store.channels()
                     reload()
                 },
+                watchNextOf = { tile ->
+                    when (tile.key) {
+                        in hiddenApps.value -> false
+                        in watchNextApps.value -> true
+                        else -> null
+                    }
+                },
+                onToggleWatchNext = { app ->
+                    store.toggleWatchNext(app)
+                    hiddenApps.value = store.hiddenApps()
+                    reload()
+                },
+                onRemove = { program ->
+                    store.remove(program)
+                    reload()
+                },
             )
         }
     }
@@ -139,10 +159,15 @@ class LauncherActivity : ComponentActivity() {
         loading = lifecycleScope.launch {
             delay(after) // Apps often write several Programs in a row: read once they're done
             val shown = store.channels()
+            val hidden = store.hiddenApps()
+            val removed = store.removed()
+            var inWatchNext = emptySet<String>()
             val (apps, rows, all) = withContext(Dispatchers.IO) {
                 val apps = loadInstalled(this@LauncherActivity)
                 val all = TvData.channels(contentResolver)
-                val watchNext = Shelf(Shelves.WATCH_NEXT, getString(R.string.watch_next), TvData.watchNext(contentResolver))
+                val everything = TvData.watchNext(contentResolver)
+                inWatchNext = everything.map { it.app }.toSet()
+                val watchNext = Shelf(Shelves.WATCH_NEXT, getString(R.string.watch_next), Shelves.visible(everything, hidden, removed))
                 val on = all.filter { it.key in shown && it.app in apps.apps }
                     .sortedBy { channel -> store.order().indexOf(channel.app).let { if (it < 0) Int.MAX_VALUE else it } }
                     .map { Shelf(it.key, "${apps.apps[it.app]?.tile?.label ?: it.app} · ${it.name}", TvData.programs(contentResolver, it), it.app) }
@@ -159,6 +184,7 @@ class LauncherActivity : ComponentActivity() {
             installed = apps
             hasStore.value = withContext(Dispatchers.IO) { storePage("").resolveActivity(packageManager) != null }
             channels.value = all
+            watchNextApps.value = inWatchNext
             val keys = TileOrder.arrange(store.order(), apps.apps.mapValues { it.value.tile.label })
             store.saveOrder(keys) // from now on, new Apps go after these
             shelves.value = rows
