@@ -30,6 +30,7 @@ class LauncherScreenTest {
     private var tiles by mutableStateOf(few)
     private var shelves by mutableStateOf(emptyList<Shelf>())
     private var home by mutableStateOf(0)
+    private var hasStore = false
     private val opened = mutableListOf<String>()
 
     private fun show() = rule.setContent {
@@ -41,6 +42,7 @@ class LauncherScreenTest {
             onOpen = { opened += it.key },
             onOpenProgram = { opened += it.key },
             onAppInfo = {},
+            onShowInStore = if (hasStore) ({ opened += "store:${it.key}" }) else null,
             onMove = { from, to ->
                 val keys = TileOrder.move(tiles.map { it.key }, from, to)
                 tiles = keys.map { key -> all.first { it.key == key } }
@@ -130,5 +132,48 @@ class LauncherScreenTest {
         rule.onNodeWithContentDescription("Show 1").assertIsFocused()
         Espresso.pressBack() // and to the Tile that had focus last
         rule.onNodeWithContentDescription("Beta").assertIsFocused()
+    }
+
+    @Test fun theProgramToContinueIsLargeFirstAndShowsTheTimeLeft() {
+        shelves = listOf(
+            Shelf(
+                Shelves.WATCH_NEXT, "Watch Next",
+                listOf(
+                    Program("w1", "nuvio", "Criminal Minds", null, "intent:x", 0.5f, left = 24 * 60_000L),
+                    Program("w2", "nuvio", "Severance", null, "intent:y"),
+                ),
+            ),
+        )
+        show()
+        rule.onNodeWithContentDescription("Criminal Minds").assertIsFocused()
+        rule.onNodeWithTag("caption").assertTextEquals("Criminal Minds · Nuvio")
+        rule.onNodeWithTag("left").assertTextEquals("24 min left")
+        press("Criminal Minds", Key.DirectionRight) // to the Keypad's first Tile
+        rule.onNodeWithContentDescription("Alpha").assertIsFocused()
+        Espresso.pressBack() // and back to the Program to continue
+        rule.onNodeWithContentDescription("Criminal Minds").assertIsFocused()
+        press("Criminal Minds", Key.DirectionDown) // the rest of Watch Next, below it
+        rule.onNodeWithContentDescription("Severance").assertIsFocused()
+        press("Severance", Key.DirectionCenter)
+        assertEquals(listOf("w2"), opened)
+    }
+
+    @Test fun nothingToContinueShowsTheTimeAndFocusesTheKeypad() {
+        show()
+        rule.onNodeWithContentDescription("Alpha").assertIsFocused()
+        rule.onNodeWithTag("left").assertDoesNotExist()
+    }
+
+    @Test fun aTilesMenuOffersItsPageInTheStore() {
+        hasStore = true
+        show()
+        rule.onNodeWithContentDescription("Alpha").performKeyInput {
+            keyDown(Key.DirectionCenter)
+            advanceEventTime(1_000)
+            keyUp(Key.DirectionCenter)
+        }
+        rule.onNodeWithText("Move").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        rule.onNodeWithText("Updates").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(listOf("store:a"), opened)
     }
 }

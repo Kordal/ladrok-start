@@ -16,6 +16,10 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
+        <!-- Ladrok Store, which shows an App's page for "Updates" in a Tile's menu -->
+        <intent>
+            <action android:name="android.intent.action.SHOW_APP_INFO" />
+        </intent>
     </queries>
 
     <application

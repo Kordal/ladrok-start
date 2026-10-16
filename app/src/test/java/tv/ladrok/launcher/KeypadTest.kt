@@ -58,4 +58,31 @@ class ShelvesTest {
         val rows = Shelves.arrange(null, listOf(Shelf("c", "Trending", (1..20).map { program("p$it") })))
         assertEquals(12, rows.single().programs.size)
     }
+
+    @Test fun `the most recent Watch Next Program is the one to continue`() {
+        val (spot, rows) = Shelves.spotlight(
+            listOf(Shelf(Shelves.WATCH_NEXT, "Watch Next", listOf(program("a"), program("b"))), Shelf("c", "Trending", listOf(program("c")))),
+        )
+        assertEquals("a", spot?.key)
+        assertEquals(listOf(listOf("b"), listOf("c")), rows.map { row -> row.programs.map { it.key } })
+    }
+
+    @Test fun `Watch Next with one Program leaves no row behind`() {
+        val (spot, rows) = Shelves.spotlight(listOf(Shelf(Shelves.WATCH_NEXT, "Watch Next", listOf(program("a")))))
+        assertEquals("a", spot?.key)
+        assertEquals(emptyList<String>(), rows.map { it.key })
+    }
+
+    @Test fun `without Watch Next nothing is singled out`() {
+        val channels = listOf(Shelf("c", "Trending", listOf(program("c"))))
+        val (spot, rows) = Shelves.spotlight(channels)
+        assertNull(spot)
+        assertEquals(channels, rows)
+    }
+
+    @Test fun `time left rounds up to whole minutes`() {
+        assertEquals(1, Shelves.minutesLeft(1_000))
+        assertEquals(24, Shelves.minutesLeft(23 * 60_000L + 1))
+        assertEquals(24, Shelves.minutesLeft(24 * 60_000L))
+    }
 }

@@ -73,6 +73,7 @@ object TvData {
             poster = getString(3),
             intentUri = getString(4),
             progress = if (position > 0 && duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else null,
+            left = if (position > 0 && duration > position) duration - position else null,
         )
     }
 
