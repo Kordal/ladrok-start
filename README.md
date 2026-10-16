@@ -2,12 +2,15 @@
 
 The home screen of [Ladrok TV](https://github.com/Kordal/ladrok-tv). Two columns, a clock, and the name of whatever has focus. Nothing else.
 
-- **Left: Watch Next and Channels**. Watch Next (what you started and can continue) is the first row when it isn't empty. Below it are the Channels you switched on. Channels are hidden until you turn them on.
+- **Left: Watch Next and Channels**. The last thing you watched comes first, large, with the time left and its App: press Home, then OK, to continue. The rest of Watch Next (what you started and can continue) follows, then the Channels you switched on, each titled with its App. Channels are hidden until you turn them on. With nothing to continue, the left side shows the Ladrok logo and the time.
 - **Right: the Keypad**. One Tile per TV app, in pages of nine, three by three like a phone keypad. Digits 1–9 on the remote open the Tile with that number. Arrow past the right edge for the next page. The Settings Tile is always last.
 - **Long-press OK on a Tile**:
   - *Move*: use the arrows, then press OK. This is the only way the order changes.
   - *Channels*: switch that app's Channels on or off.
+  - *Updates*: the App's page in [Ladrok Store](https://github.com/Kordal/ladrok-store), where its updates come from.
   - *App info*
+
+  The menu opens beside the Tile.
 - **Back** hops between the rows and the Keypad.
 - **Home** on the home screen jumps back to the start.
 

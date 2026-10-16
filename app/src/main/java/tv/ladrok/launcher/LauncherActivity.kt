@@ -37,6 +37,8 @@ class LauncherActivity : ComponentActivity() {
     private val channels = mutableStateOf<List<TvData.Channel>>(emptyList())
     private val shownChannels = mutableStateOf<Set<String>>(emptySet())
     private val home = mutableIntStateOf(0)
+    /** Whether Ladrok Store is here to show an App's page; read with the Apps. */
+    private val hasStore = mutableStateOf(false)
     private var loading: Job? = null
 
     // Apps installed, removed or updated while the Launcher is running.
@@ -77,10 +79,12 @@ class LauncherActivity : ComponentActivity() {
                 shelves = shelves.value,
                 tiles = tiles.value,
                 appName = { installed?.apps?.get(it)?.tile?.label ?: it },
+                appIcon = { installed?.apps?.get(it)?.tile?.icon },
                 home = home.intValue,
                 onOpen = ::open,
                 onOpenProgram = ::open,
                 onAppInfo = ::showAppInfo,
+                onShowInStore = if (hasStore.value) ::showInStore else null,
                 onMove = ::move,
                 channelsOf = { tile ->
                     channels.value.filter { it.app == tile.key }
@@ -123,13 +127,14 @@ class LauncherActivity : ComponentActivity() {
             val (apps, rows, all) = withContext(Dispatchers.IO) {
                 val apps = loadInstalled(this@LauncherActivity)
                 val all = TvData.channels(contentResolver)
-                val watchNext = Shelf("watch-next", getString(R.string.watch_next), TvData.watchNext(contentResolver))
+                val watchNext = Shelf(Shelves.WATCH_NEXT, getString(R.string.watch_next), TvData.watchNext(contentResolver))
                 val on = all.filter { it.key in shown && it.app in apps.apps }
                     .sortedBy { channel -> store.order().indexOf(channel.app).let { if (it < 0) Int.MAX_VALUE else it } }
-                    .map { Shelf(it.key, "${apps.apps[it.app]?.tile?.label ?: it.app} · ${it.name}", TvData.programs(contentResolver, it)) }
+                    .map { Shelf(it.key, "${apps.apps[it.app]?.tile?.label ?: it.app} · ${it.name}", TvData.programs(contentResolver, it), it.app) }
                 Triple(apps, Shelves.arrange(watchNext, on), all)
             }
             installed = apps
+            hasStore.value = withContext(Dispatchers.IO) { storePage("").resolveActivity(packageManager) != null }
             channels.value = all
             val keys = TileOrder.arrange(store.order(), apps.apps.mapValues { it.value.tile.label })
             store.saveOrder(keys) // from now on, new Apps go after these
@@ -176,6 +181,14 @@ class LauncherActivity : ComponentActivity() {
         )
     }
 
+    /** Ladrok Store's page for an App, where its updates come from. */
+    private fun storePage(app: String) = Intent(Intent.ACTION_SHOW_APP_INFO)
+        .setPackage(STORE)
+        .putExtra(Intent.EXTRA_PACKAGE_NAME, app)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    private fun showInStore(tile: Tile) = start(storePage(tile.key))
+
     private fun start(intent: Intent) {
         try {
             startActivity(intent)
@@ -184,5 +197,9 @@ class LauncherActivity : ComponentActivity() {
         } catch (_: SecurityException) {
             // A Program link to something the App doesn't export: nothing to open.
         }
+    }
+
+    private companion object {
+        const val STORE = "tv.ladrok.store"
     }
 }

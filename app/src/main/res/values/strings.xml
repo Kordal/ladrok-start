@@ -9,5 +9,10 @@
     <string name="channel_on">On</string>
     <string name="channel_off">Off</string>
     <string name="watch_next">Watch Next</string>
+    <string name="channels_on">%1$d of %2$d on</string>
+    <string name="updates">Updates</string>
+    <string name="updates_where">Ladrok Store</string>
+    <string name="minutes_left">%1$d min left</string>
+    <string name="hours_left">%1$d h %2$d min left</string>
     <string name="move_hint">Use the arrows to move %1$s. Press OK when done.</string>
 </resources>
