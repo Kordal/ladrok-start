@@ -90,8 +90,8 @@ class Playing(val app: String, val at: Long, val title: String, val poster: Stri
  * its Watch Next, else what its player said it was playing, else just the App.
  */
 object Continue {
-    /** Shorter visits (a look at Settings, a wrong App) don't replace what the viewer was watching. */
-    const val MIN_VISIT = 60_000L
+    /** Shorter visits (a wrong App, opened and closed) don't replace what the viewer was watching. */
+    const val MIN_VISIT = 10_000L
 
     fun pick(watchNext: List<Program>, visit: Visit?, playing: Playing?): Program? {
         val next = watchNext.firstOrNull()
