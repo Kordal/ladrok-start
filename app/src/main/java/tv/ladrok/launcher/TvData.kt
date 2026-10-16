@@ -74,6 +74,7 @@ object TvData {
             intentUri = getString(4),
             progress = if (position > 0 && duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else null,
             left = if (position > 0 && duration > position) duration - position else null,
+            at = if (columnCount > 8 && !isNull(8)) getLong(8) else null, // Watch Next's last engagement
         )
     }
 

@@ -2,7 +2,7 @@
 
 The home screen of [Ladrok TV](https://github.com/Kordal/ladrok-tv). Two columns, a clock, and the name of whatever has focus. Nothing else.
 
-- **Left: Watch Next and Channels**. The last thing you watched comes first, large, with the time left and its App: press Home, then OK, to continue. The rest of Watch Next (what you started and can continue) follows, then the Channels you switched on, each titled with its App. Channels are hidden until you turn them on. With nothing to continue, the left side shows the Ladrok logo and the time.
+- **Left: Watch Next and Channels**. The last thing you watched comes first, large, with the time left and its App: press Home, then OK, to continue. It works for any App you opened from the Launcher and stayed in for a minute. It shows what the App put in Watch Next, or else what its player was playing (title, poster, time left; Ladrok TV grants the Launcher MEDIA_CONTENT_CONTROL for this). Failing both, it shows the App's banner, or the Ladrok logo, and opens the App. The rest of Watch Next (what you started and can continue) follows, then the Channels you switched on, each titled with its App. Channels are hidden until you turn them on. With nothing to continue, the left side shows the Ladrok logo and the time.
 - **Right: the Keypad**. One Tile per TV app, in pages of nine, three by three like a phone keypad. Digits 1–9 on the remote open the Tile with that number. Arrow past the right edge for the next page. The Settings Tile is always last.
 - **Long-press OK on a Tile**:
   - *Move*: use the arrows, then press OK. This is the only way the order changes.

@@ -130,12 +130,18 @@ fun LauncherScreen(
     onMove: (from: Int, to: Int) -> Unit,
     channelsOf: (Tile) -> List<ChannelChoice>,
     onToggleChannel: (String) -> Unit,
+    /** What the large card continues: by default the most recent in Watch Next ([Continue] picks it in the app). */
+    continueWith: Program? = Shelves.latest(shelves),
+    /** The banner of [continueWith]'s App, when the card shows just the App. */
+    continueBanner: ImageBitmap? = null,
 ) {
     var caption by remember { mutableStateOf("") }
     // Time left in the focused Program, on the right of the caption.
     var captionLeft by remember { mutableStateOf("") }
     val resources = LocalContext.current.resources
-    val (spotlight, shelfRows) = remember(shelves) { Shelves.spotlight(shelves) }
+    val (spotlight, shelfRows) = remember(shelves, continueWith) { Shelves.spotlight(shelves, continueWith) }
+    // Nothing to continue and no rows: the time, large, and the Keypad.
+    val nothing = spotlight == null && shelfRows.isEmpty()
     var focusedTile by remember { mutableIntStateOf(-1) }
     var menuFor by remember { mutableStateOf<Tile?>(null) }
     var channelsFor by remember { mutableStateOf<Tile?>(null) }
@@ -176,7 +182,7 @@ fun LauncherScreen(
         if (home > 0 || caption.isEmpty()) {
             page = 0
             withFrameNanos {}
-            if (shelves.isEmpty() || !runCatching { firstProgram.requestFocus() }.getOrDefault(false)) showCell(0)
+            if (nothing || !runCatching { firstProgram.requestFocus() }.getOrDefault(false)) showCell(0)
         }
     }
     LaunchedEffect(focusCell) {
@@ -189,7 +195,7 @@ fun LauncherScreen(
     LaunchedEffect(movingIndex) { if (movingIndex >= 0) showCell(movingIndex) }
     BackHandler(enabled = moving != null) { moving = null }
     // Back hops between the rows and the Keypad: one press instead of walking past every Program.
-    BackHandler(enabled = moving == null && shelves.isNotEmpty()) {
+    BackHandler(enabled = moving == null && !nothing) {
         if (focusedTile >= 0) {
             scope.launch {
                 rows.scrollToItem(0)
@@ -256,12 +262,12 @@ fun LauncherScreen(
                 .padding(horizontal = 36.dp, vertical = 20.dp),
         ) {
             Box(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterEnd) {
-                if (shelves.isNotEmpty()) Clock() // with nothing to continue, the time is large on the left
+                if (!nothing) Clock() // with nothing to continue, the time is large on the left
             }
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(36.dp)) {
                 val menuOpen = menuFor != null || channelsFor != null
                 Box(Modifier.weight(2f).fillMaxHeight().alpha(if (menuOpen) DIMMED else 1f)) {
-                    if (shelves.isEmpty()) {
+                    if (nothing) {
                         // Nothing to continue: the Ladrok logo, faint, and the time.
                         Image(
                             painterResource(R.drawable.ladrok_logo),
@@ -279,7 +285,7 @@ fun LauncherScreen(
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         val onFocusProgram = { program: Program ->
-                            caption = "${program.title} · ${appName(program.app)}"
+                            caption = if (program.onlyApp) appName(program.app) else "${program.title} · ${appName(program.app)}"
                             captionLeft = timeLeft(program)
                             focusedTile = -1
                         }
@@ -289,6 +295,7 @@ fun LauncherScreen(
                                 appName = appName(spotlight.app),
                                 appIcon = appIcon(spotlight.app),
                                 timeLeft = timeLeft(spotlight),
+                                banner = continueBanner,
                                 first = firstProgram,
                                 keypad = cells[0],
                                 onOpen = onOpenProgram,
@@ -422,6 +429,7 @@ private fun Spotlight(
     appName: String,
     appIcon: ImageBitmap?,
     timeLeft: String,
+    banner: ImageBitmap?,
     first: FocusRequester,
     keypad: FocusRequester,
     onOpen: (Program) -> Unit,
@@ -431,6 +439,7 @@ private fun Spotlight(
         ProgramCard(
             program = program,
             width = 340.dp,
+            banner = banner,
             onClick = { onOpen(program) },
             modifier = Modifier
                 .focusRequester(first)
@@ -438,8 +447,10 @@ private fun Spotlight(
                 .onFocusChanged { if (it.hasFocus) onFocus(program) },
         )
         Column(Modifier.height(191.dp).padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(program.title, color = Ink, fontSize = 26.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (timeLeft.isNotEmpty()) Text(timeLeft, color = Muted, fontSize = 16.sp)
+            // Just the App (it doesn't say what was playing): its name, and that this is where the viewer was.
+            Text(if (program.onlyApp) appName else program.title, color = Ink, fontSize = 26.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (program.onlyApp) Text(stringResource(R.string.continue_app), color = Muted, fontSize = 16.sp)
+            else if (timeLeft.isNotEmpty()) Text(timeLeft, color = Muted, fontSize = 16.sp)
             Spacer(Modifier.weight(1f))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (appIcon != null) Image(appIcon, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -498,25 +509,37 @@ private fun tileColors() = ClickableSurfaceDefaults.colors(
 )
 
 @Composable
-private fun ProgramCard(program: Program, width: Dp, onClick: () -> Unit, modifier: Modifier) {
+private fun ProgramCard(program: Program, width: Dp, onClick: () -> Unit, modifier: Modifier, banner: ImageBitmap? = null) {
     Surface(
         onClick = onClick,
-        modifier = modifier.width(width).aspectRatio(16f / 9f).semantics { contentDescription = program.title },
+        modifier = modifier.width(width).aspectRatio(16f / 9f).semantics { contentDescription = program.title.ifEmpty { program.app } },
         shape = ClickableSurfaceDefaults.shape(shape),
         colors = tileColors(),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f, pressedScale = 1.05f),
         border = ClickableSurfaceDefaults.border(focusedBorder = outline, pressedBorder = outline),
     ) {
-        // The title shows until (or unless) the poster loads over it.
-        Text(
-            program.title, color = Ink, fontSize = 14.sp, maxLines = 2, textAlign = TextAlign.Center,
-            overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.Center).padding(12.dp),
-        )
-        if (program.poster != null) {
-            AsyncImage(program.poster, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        }
-        program.progress?.let {
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(it).height(3.dp).background(Silver))
+        if (program.onlyApp) {
+            // Just the App: its banner, or the Ladrok logo when it has none.
+            if (banner != null) {
+                Image(banner, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            } else {
+                Image(
+                    painterResource(R.drawable.ladrok_logo), contentDescription = null, colorFilter = ColorFilter.tint(Silver),
+                    alpha = 0.5f, modifier = Modifier.align(Alignment.Center).fillMaxHeight(0.5f),
+                )
+            }
+        } else {
+            // The title shows until (or unless) the poster loads over it.
+            Text(
+                program.title, color = Ink, fontSize = 14.sp, maxLines = 2, textAlign = TextAlign.Center,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.Center).padding(12.dp),
+            )
+            if (program.poster != null) {
+                AsyncImage(program.poster, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
+            program.progress?.let {
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(it).height(3.dp).background(Silver))
+            }
         }
     }
 }

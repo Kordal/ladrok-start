@@ -31,6 +31,8 @@ class LauncherScreenTest {
     private var shelves by mutableStateOf(emptyList<Shelf>())
     private var home by mutableStateOf(0)
     private var hasStore = false
+    /** What [Continue] picked in the app; null for the default, the most recent in Watch Next. */
+    private var continueWith: Program? = null
     private val opened = mutableListOf<String>()
 
     private fun show() = rule.setContent {
@@ -49,6 +51,7 @@ class LauncherScreenTest {
             },
             channelsOf = { emptyList() },
             onToggleChannel = {},
+            continueWith = continueWith ?: Shelves.latest(shelves),
         )
     }
 
@@ -175,5 +178,15 @@ class LauncherScreenTest {
         rule.onNodeWithText("Move").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         rule.onNodeWithText("Updates").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(listOf("store:a"), opened)
+    }
+
+    @Test fun anAppThatSaysNothingStillContinuesOnTheLargeCard() {
+        continueWith = Program("app:stremio", "stremio", "", null, null, onlyApp = true)
+        show()
+        rule.onNodeWithContentDescription("stremio").assertIsFocused()
+        rule.onNodeWithTag("caption").assertTextEquals("Nuvio")
+        rule.onNodeWithText("Pick up where you left off").assertExists()
+        press("stremio", Key.DirectionCenter)
+        assertEquals(listOf("app:stremio"), opened)
     }
 }

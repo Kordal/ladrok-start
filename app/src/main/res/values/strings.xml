@@ -13,6 +13,8 @@
     <string name="updates">Updates</string>
     <string name="updates_where">Ladrok Store</string>
     <string name="minutes_left">%1$d min left</string>
+    <!-- Under an App's name on the large card, when the App doesn't say what was playing -->
+    <string name="continue_app">Pick up where you left off</string>
     <string name="hours_left">%1$d h %2$d min left</string>
     <string name="move_hint">Use the arrows to move %1$s. Press OK when done.</string>
 </resources>

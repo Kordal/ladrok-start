@@ -19,6 +19,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -31,9 +33,14 @@ import java.net.URISyntaxException
 /** The Ladrok TV home screen. */
 class LauncherActivity : ComponentActivity() {
     private lateinit var store: Store
+    private lateinit var recent: Recent
+    private lateinit var players: Players
     private var installed: Installed? = null
     private val tiles = mutableStateOf<List<Tile>>(emptyList())
     private val shelves = mutableStateOf<List<Shelf>>(emptyList())
+    /** What the large card continues ([Continue]), and the App's banner when it shows just the App. */
+    private val continueWith = mutableStateOf<Program?>(null)
+    private val banner = mutableStateOf<ImageBitmap?>(null)
     private val channels = mutableStateOf<List<TvData.Channel>>(emptyList())
     private val shownChannels = mutableStateOf<Set<String>>(emptySet())
     private val home = mutableIntStateOf(0)
@@ -56,6 +63,9 @@ class LauncherActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = Store(this)
+        recent = Recent(this)
+        players = Players(this, recent) { reload(after = 500) }
+        players.start()
         shownChannels.value = store.channels()
         onBackPressedDispatcher.addCallback(this) {} // Back on the home screen goes nowhere
         val filter = IntentFilter().apply {
@@ -77,6 +87,8 @@ class LauncherActivity : ComponentActivity() {
         setContent {
             LauncherScreen(
                 shelves = shelves.value,
+                continueWith = continueWith.value,
+                continueBanner = banner.value,
                 tiles = tiles.value,
                 appName = { installed?.apps?.get(it)?.tile?.label ?: it },
                 appIcon = { installed?.apps?.get(it)?.tile?.icon },
@@ -101,10 +113,13 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        players.snapshot()
+        recent.back()
         reload()
     }
 
     override fun onDestroy() {
+        players.stop()
         unregisterReceiver(packages)
         contentResolver.unregisterContentObserver(programs)
         super.onDestroy()
@@ -133,6 +148,14 @@ class LauncherActivity : ComponentActivity() {
                     .map { Shelf(it.key, "${apps.apps[it.app]?.tile?.label ?: it.app} · ${it.name}", TvData.programs(contentResolver, it), it.app) }
                 Triple(apps, Shelves.arrange(watchNext, on), all)
             }
+            val pick = Continue.pick(rows.firstOrNull { it.key == Shelves.WATCH_NEXT }?.programs.orEmpty(), recent.visit(), recent.playing())
+                ?.takeIf { it.app in apps.apps } // not an App that has since been uninstalled
+            banner.value = if (pick?.onlyApp == true) {
+                withContext(Dispatchers.IO) { loadBanner(this@LauncherActivity, pick.app, apps.apps[pick.app]?.launch?.component)?.asImageBitmap() }
+            } else {
+                null
+            }
+            continueWith.value = pick
             installed = apps
             hasStore.value = withContext(Dispatchers.IO) { storePage("").resolveActivity(packageManager) != null }
             channels.value = all
@@ -160,6 +183,7 @@ class LauncherActivity : ComponentActivity() {
         } else {
             installed?.apps?.get(tile.key)?.launch ?: return
         }
+        if (tile.key != TileOrder.SETTINGS && tile.key != STORE) recent.opened(tile.key)
         start(intent)
     }
 
@@ -171,6 +195,7 @@ class LauncherActivity : ComponentActivity() {
                 null
             }
         } ?: installed?.apps?.get(program.app)?.launch ?: return // no link to the Program: open its App
+        recent.opened(program.app)
         start(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
