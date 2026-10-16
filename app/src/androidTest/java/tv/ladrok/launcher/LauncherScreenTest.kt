@@ -148,6 +148,10 @@ class LauncherScreenTest {
         rule.onNodeWithContentDescription("Criminal Minds").assertIsFocused()
         rule.onNodeWithTag("caption").assertTextEquals("Criminal Minds · Nuvio")
         rule.onNodeWithTag("left").assertTextEquals("24 min left")
+        press("Criminal Minds", Key.DirectionRight) // to the Keypad's first Tile
+        rule.onNodeWithContentDescription("Alpha").assertIsFocused()
+        Espresso.pressBack() // and back to the Program to continue
+        rule.onNodeWithContentDescription("Criminal Minds").assertIsFocused()
         press("Criminal Minds", Key.DirectionDown) // the rest of Watch Next, below it
         rule.onNodeWithContentDescription("Severance").assertIsFocused()
         press("Severance", Key.DirectionCenter)

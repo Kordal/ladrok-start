@@ -42,6 +42,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -289,6 +290,7 @@ fun LauncherScreen(
                                 appIcon = appIcon(spotlight.app),
                                 timeLeft = timeLeft(spotlight),
                                 first = firstProgram,
+                                keypad = cells[0],
                                 onOpen = onOpenProgram,
                                 onFocus = onFocusProgram,
                             )
@@ -421,6 +423,7 @@ private fun Spotlight(
     appIcon: ImageBitmap?,
     timeLeft: String,
     first: FocusRequester,
+    keypad: FocusRequester,
     onOpen: (Program) -> Unit,
     onFocus: (Program) -> Unit,
 ) {
@@ -429,7 +432,10 @@ private fun Spotlight(
             program = program,
             width = 340.dp,
             onClick = { onOpen(program) },
-            modifier = Modifier.focusRequester(first).onFocusChanged { if (it.hasFocus) onFocus(program) },
+            modifier = Modifier
+                .focusRequester(first)
+                .focusProperties { end = keypad } // towards the Keypad: its first Tile, not whichever is level with the card
+                .onFocusChanged { if (it.hasFocus) onFocus(program) },
         )
         Column(Modifier.height(191.dp).padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(program.title, color = Ink, fontSize = 26.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
