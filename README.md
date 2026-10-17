@@ -14,6 +14,7 @@ The home screen of [Ladrok TV](https://github.com/Kordal/ladrok-tv). Two columns
   The menu opens beside the Tile.
 - **Back** hops between the rows and the Keypad.
 - **Home** on the home screen jumps back to the start.
+- **A pointer** (an air mouse such as Ladrok Remote's, or any mouse): what it points at takes the focus, a click opens it, and a long click opens its menu. The wheel scrolls the rows and turns the Keypad's pages, and a click on the page number turns it too. In *Move*, click the cell to put the Tile in.
 
 The repo is called `ladrok-start`. The app, package (`tv.ladrok.launcher`) and APK are *Ladrok Launcher*.
 
@@ -26,7 +27,7 @@ You need the Android SDK and JDK 21 or newer (the one bundled with Android Studi
 ```bash
 ./gradlew testDebugUnitTest          # Tile order, Keypad paging, rows and Continue card rules
 ./gradlew installDebug               # onto a connected Android TV device or emulator
-./gradlew connectedDebugAndroidTest  # D-pad UI tests, on a device or emulator
+./gradlew connectedDebugAndroidTest  # D-pad and pointer UI tests, on a device or emulator
 ```
 
 On a stock Android TV device, press Home and pick *Ladrok Launcher*.
