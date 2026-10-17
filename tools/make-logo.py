@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Make the Launcher's background logo from the Ladrok logo: silver line art on a dark background,
-the same source file as ladrok-tv's docs/ladrok-logo-source.png.
+"""Make the Launcher's background logo from the Ladrok logo: the silver Slash mark over the LADROK
+wordmark on a dark background, the same source file as ladrok-tv's docs/ladrok-logo-source.png.
 
   python3 tools/make-logo.py docs/ladrok-logo-source.png app/src/main/res/drawable-nodpi/ladrok_logo.png
 
-Writes white line art on transparent, cropped to the logo. Brightness becomes coverage (as in
+Writes the logo in white on transparent, cropped to the logo. Brightness becomes coverage (as in
 ladrok-tv's tools/make-logo-assets.py), so there is no box around it; the Launcher tints and dims it.
 Needs Pillow.
 """
