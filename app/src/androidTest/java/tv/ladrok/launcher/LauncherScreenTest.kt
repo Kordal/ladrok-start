@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.espresso.Espresso
 import org.junit.Assert.assertEquals
@@ -218,5 +219,37 @@ class LauncherScreenTest {
         rule.onNodeWithText("Move").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         rule.onNodeWithText("Watch Next").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(listOf("toggle:a"), opened)
+    }
+
+    // An air mouse (or any mouse): hover focuses, click opens, a long click is the long press.
+
+    @Test fun hoverFocusesAndClickOpens() {
+        show()
+        rule.onNodeWithContentDescription("Gamma").performMouseInput { moveTo(center) }
+        rule.onNodeWithContentDescription("Gamma").assertIsFocused()
+        rule.onNodeWithTag("caption").assertTextEquals("Gamma")
+        rule.onNodeWithContentDescription("Gamma").performMouseInput { click(center) }
+        rule.runOnIdle { assertEquals(listOf("c"), opened) } // once, not twice
+    }
+
+    @Test fun longClickOpensTheTileMenuAndClickMovesTheTile() {
+        show()
+        rule.onNodeWithContentDescription("Alpha").performMouseInput { longClick(center) }
+        rule.onNodeWithText("Move").performMouseInput { click(center) }
+        rule.onNodeWithContentDescription("Gamma").performMouseInput { click(center) } // put Alpha where Gamma is
+        rule.runOnIdle {
+            assertEquals(listOf("b", "c", "a", SETTINGS), tiles.map { it.key })
+            assertEquals(emptyList<String>(), opened)
+        }
+    }
+
+    @Test fun wheelOverTheKeypadTurnsThePage() {
+        all = (1..10).map { Tile("app$it", "App $it") } + Tile(SETTINGS, "Settings")
+        tiles = all
+        show()
+        rule.onNodeWithContentDescription("App 5").performMouseInput { moveTo(center); scroll(1f) }
+        rule.onNodeWithTag("page").assertTextEquals("2 / 2")
+        rule.onNodeWithTag("page").performMouseInput { click(center) } // a click on the page number turns it too
+        rule.onNodeWithTag("page").assertTextEquals("1 / 2")
     }
 }

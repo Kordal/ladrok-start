@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -115,6 +116,8 @@ class ChannelChoice(val key: String, val name: String, val shown: Boolean)
  * Long-press OK on a Tile for Move, Channels, Watch Next, Updates (when [onShowInStore] is set) and App info, in a
  * menu beside the Tile; digits 1–9 open the Tile with that digit; Back hops between the rows and the
  * Keypad. [home] goes up each time Home is pressed while the Launcher is already showing.
+ * With a pointer (an air mouse): hover focuses, click opens, a long click is the long press, the
+ * wheel over the Keypad turns its pages, and in Move mode a click on a cell puts the Tile there.
  */
 @Composable
 fun LauncherScreen(
@@ -250,139 +253,156 @@ fun LauncherScreen(
         }
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Black)
-            .onPreviewKeyEvent { event ->
-                // Digits open the Tile with that digit on the page shown.
-                val digit = DIGIT_KEYS[event.key] ?: return@onPreviewKeyEvent false
-                if (moving == null && event.type == KeyEventType.KeyDown) {
-                    Keypad.indexOf(page, digit, tiles.size)?.let { onOpen(tiles[it]) }
-                }
-                true
-            },
-    ) {
-        Column(
+    val menuOpen = menuFor != null || channelsFor != null || programMenu != null
+    CompositionLocalProvider(LocalHoverFocus provides !menuOpen) {
+        Box(
             Modifier
                 .fillMaxSize()
-                .safeDrawingPadding() // no-op on a TV; keeps clear of system bars elsewhere
-                .padding(horizontal = 36.dp, vertical = 20.dp),
+                .background(Black)
+                .onPreviewKeyEvent { event ->
+                    // Digits open the Tile with that digit on the page shown.
+                    val digit = DIGIT_KEYS[event.key] ?: return@onPreviewKeyEvent false
+                    if (moving == null && event.type == KeyEventType.KeyDown) {
+                        Keypad.indexOf(page, digit, tiles.size)?.let { onOpen(tiles[it]) }
+                    }
+                    true
+                },
         ) {
-            Box(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterEnd) {
-                if (!nothing) Clock() // with nothing to continue, the time is large on the left
-            }
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(36.dp)) {
-                val menuOpen = menuFor != null || channelsFor != null || programMenu != null
-                Box(Modifier.weight(2f).fillMaxHeight().alpha(if (menuOpen) DIMMED else 1f)) {
-                    if (nothing) {
-                        // Nothing to continue: the Ladrok logo, faint, and the time.
-                        Image(
-                            painterResource(R.drawable.ladrok_logo),
-                            contentDescription = null,
-                            colorFilter = ColorFilter.tint(Silver),
-                            alpha = 0.14f,
-                            modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp).fillMaxHeight(0.45f),
-                        )
-                        BigClock(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 4.dp))
-                    }
-                    LazyColumn(
-                        contentPadding = PaddingValues(vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                        state = rows,
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        val onFocusProgram = { program: Program ->
-                            caption = if (program.onlyApp) appName(program.app) else "${program.title} · ${appName(program.app)}"
-                            captionLeft = timeLeft(program)
-                            focusedTile = -1
-                        }
-                        if (spotlight != null) item(key = "spotlight") {
-                            Spotlight(
-                                program = spotlight,
-                                appName = appName(spotlight.app),
-                                appIcon = appIcon(spotlight.app),
-                                timeLeft = timeLeft(spotlight),
-                                banner = continueBanner,
-                                first = firstProgram,
-                                keypad = cells[0],
-                                onOpen = onOpenProgram,
-                                onLongPress = { programMenu = it },
-                                onFocus = onFocusProgram,
-                            )
-                        }
-                        itemsIndexed(shelfRows, key = { _, shelf -> shelf.key }) { row, shelf ->
-                            ShelfRow(
-                                shelf = shelf,
-                                icon = shelf.app?.let(appIcon),
-                                small = spotlight != null,
-                                first = if (row == 0 && spotlight == null) firstProgram else null,
-                                state = if (row == 0) firstRow else rememberLazyListState(),
-                                onOpen = onOpenProgram,
-                                onLongPress = { programMenu = it },
-                                onFocus = onFocusProgram,
-                            )
-                        }
-                    }
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding() // no-op on a TV; keeps clear of system bars elsewhere
+                    .padding(horizontal = 36.dp, vertical = 20.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterEnd) {
+                    if (!nothing) Clock() // with nothing to continue, the time is large on the left
                 }
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .padding(vertical = 12.dp)
-                        .onPreviewKeyEvent(::keypadKey),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    for (row in 0 until Keypad.COLUMNS) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            for (column in 0 until Keypad.COLUMNS) {
-                                val cell = row * Keypad.COLUMNS + column
-                                val index = page * Keypad.PER_PAGE + cell
-                                val tile = tiles.getOrNull(index)
-                                if (tile == null) {
-                                    Spacer(Modifier.weight(1f).aspectRatio(1f))
-                                } else key(tile.key) {
-                                    val isSettings = tile.key == TileOrder.SETTINGS
-                                    val menuTile = (menuFor ?: channelsFor)?.key
-                                    KeypadCell(
-                                        tile = tile,
-                                        digit = Keypad.digitOf(index),
-                                        onClick = { onOpen(tile) },
-                                        onLongClick = if (isSettings || moving != null) null else ({ menuFor = tile }),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .alpha(if (menuTile != null && menuTile != tile.key) DIMMED else 1f)
-                                            .onGloballyPositioned { cellBounds[cell] = it.boundsInWindow().roundToIntRect() }
-                                            .focusRequester(cells[cell])
-                                            .onFocusChanged {
-                                                if (it.hasFocus) {
-                                                    focusedTile = index; lastTile = index; caption = tile.label; captionLeft = ""
-                                                }
-                                            },
-                                    )
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(36.dp)) {
+                    Box(Modifier.weight(2f).fillMaxHeight().alpha(if (menuOpen) DIMMED else 1f)) {
+                        if (nothing) {
+                            // Nothing to continue: the Ladrok logo, faint, and the time.
+                            Image(
+                                painterResource(R.drawable.ladrok_logo),
+                                contentDescription = null,
+                                colorFilter = ColorFilter.tint(Silver),
+                                alpha = 0.14f,
+                                modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp).fillMaxHeight(0.45f),
+                            )
+                            BigClock(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 4.dp))
+                        }
+                        LazyColumn(
+                            contentPadding = PaddingValues(vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(20.dp),
+                            state = rows,
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            val onFocusProgram = { program: Program ->
+                                caption = if (program.onlyApp) appName(program.app) else "${program.title} · ${appName(program.app)}"
+                                captionLeft = timeLeft(program)
+                                focusedTile = -1
+                            }
+                            if (spotlight != null) item(key = "spotlight") {
+                                Spotlight(
+                                    program = spotlight,
+                                    appName = appName(spotlight.app),
+                                    appIcon = appIcon(spotlight.app),
+                                    timeLeft = timeLeft(spotlight),
+                                    banner = continueBanner,
+                                    first = firstProgram,
+                                    keypad = cells[0],
+                                    onOpen = onOpenProgram,
+                                    onLongPress = { programMenu = it },
+                                    onFocus = onFocusProgram,
+                                )
+                            }
+                            itemsIndexed(shelfRows, key = { _, shelf -> shelf.key }) { row, shelf ->
+                                ShelfRow(
+                                    shelf = shelf,
+                                    icon = shelf.app?.let(appIcon),
+                                    small = spotlight != null,
+                                    first = if (row == 0 && spotlight == null) firstProgram else null,
+                                    state = if (row == 0) firstRow else rememberLazyListState(),
+                                    onOpen = onOpenProgram,
+                                    onLongPress = { programMenu = it },
+                                    onFocus = onFocusProgram,
+                                )
+                            }
+                        }
+                    }
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(vertical = 12.dp)
+                            .onPreviewKeyEvent(::keypadKey)
+                            .onWheel { step ->
+                                val to = (page + step).coerceIn(0, pages - 1)
+                                if (moving == null && to != page) showCell(to * Keypad.PER_PAGE + focusedTile.coerceAtLeast(0) % Keypad.PER_PAGE)
+                            },
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        for (row in 0 until Keypad.COLUMNS) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                for (column in 0 until Keypad.COLUMNS) {
+                                    val cell = row * Keypad.COLUMNS + column
+                                    val index = page * Keypad.PER_PAGE + cell
+                                    val tile = tiles.getOrNull(index)
+                                    if (tile == null) {
+                                        Spacer(Modifier.weight(1f).aspectRatio(1f))
+                                    } else key(tile.key) {
+                                        val isSettings = tile.key == TileOrder.SETTINGS
+                                        val menuTile = (menuFor ?: channelsFor)?.key
+                                        // In Move mode (only a pointer gets here: OK is taken before) a click puts the Tile in this cell.
+                                        val onClick = {
+                                            if (movingIndex >= 0) { onMove(movingIndex, index); moving = null } else onOpen(tile)
+                                        }
+                                        val onLongClick = if (isSettings || moving != null) null else ({ menuFor = tile })
+                                        KeypadCell(
+                                            tile = tile,
+                                            digit = Keypad.digitOf(index),
+                                            onClick = onClick,
+                                            onLongClick = onLongClick,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .pointer(onClick, onLongClick)
+                                                .alpha(if (menuTile != null && menuTile != tile.key) DIMMED else 1f)
+                                                .onGloballyPositioned { cellBounds[cell] = it.boundsInWindow().roundToIntRect() }
+                                                .focusRequester(cells[cell])
+                                                .onFocusChanged {
+                                                    if (it.hasFocus) {
+                                                        focusedTile = index; lastTile = index; caption = tile.label; captionLeft = ""
+                                                    }
+                                                },
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            Row(
-                Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val text = if (movingIndex >= 0) stringResource(R.string.move_hint, tiles[movingIndex].label) else caption
-                Text(
-                    text, color = Muted, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).testTag("caption"),
-                )
-                if (movingIndex < 0 && captionLeft.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val text = if (movingIndex >= 0) stringResource(R.string.move_hint, tiles[movingIndex].label) else caption
                     Text(
-                        captionLeft, color = Muted, fontSize = 20.sp, maxLines = 1,
-                        modifier = Modifier.padding(start = 24.dp).testTag("left"),
+                        text, color = Muted, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).testTag("caption"),
                     )
-                }
-                if (pages > 1) {
-                    Text("${page + 1} / $pages", color = Muted, fontSize = 20.sp, modifier = Modifier.padding(start = 24.dp).testTag("page"))
+                    if (movingIndex < 0 && captionLeft.isNotEmpty()) {
+                        Text(
+                            captionLeft, color = Muted, fontSize = 20.sp, maxLines = 1,
+                            modifier = Modifier.padding(start = 24.dp).testTag("left"),
+                        )
+                    }
+                    if (pages > 1) {
+                        Text(
+                            "${page + 1} / $pages", color = Muted, fontSize = 20.sp,
+                            // A click turns the page, for a pointer without a wheel.
+                            modifier = Modifier.padding(start = 24.dp).testTag("page")
+                                .onPointerTap { if (moving == null) showCell((page + 1) % pages * Keypad.PER_PAGE) },
+                        )
+                    }
                 }
             }
         }
@@ -551,7 +571,7 @@ private fun ProgramCard(
         onClick = onClick,
         // Only Watch Next can be taken out; a Channel is switched off from its App's Tile.
         onLongClick = if (program.inWatchNext) onLongClick else null,
-        modifier = modifier.width(width).aspectRatio(16f / 9f).semantics { contentDescription = program.title.ifEmpty { program.app } },
+        modifier = modifier.pointer(onClick, if (program.inWatchNext) onLongClick else null).width(width).aspectRatio(16f / 9f).semantics { contentDescription = program.title.ifEmpty { program.app } },
         shape = ClickableSurfaceDefaults.shape(shape),
         colors = tileColors(),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f, pressedScale = 1.05f),
@@ -622,26 +642,28 @@ private fun Menu(title: String, beside: IntRect?, items: List<Pair<String, () ->
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        val first = remember { FocusRequester() }
-        Column(
-            Modifier
-                .width(320.dp)
-                .background(Raised, RoundedCornerShape(12.dp))
-                .border(1.dp, Line, RoundedCornerShape(12.dp))
-                .padding(8.dp)
-                .ignoreHeldOk(),
-        ) {
-            Text(
-                title, color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 4.dp),
-            )
-            items.forEachIndexed { index, (label, onClick) ->
-                MenuItem(label, onClick, if (index == 0) Modifier.focusRequester(first) else Modifier)
+        CompositionLocalProvider(LocalHoverFocus provides true) {
+            val first = remember { FocusRequester() }
+            Column(
+                Modifier
+                    .width(320.dp)
+                    .background(Raised, RoundedCornerShape(12.dp))
+                    .border(1.dp, Line, RoundedCornerShape(12.dp))
+                    .padding(8.dp)
+                    .ignoreHeldOk(),
+            ) {
+                Text(
+                    title, color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 4.dp),
+                )
+                items.forEachIndexed { index, (label, onClick) ->
+                    MenuItem(label, onClick, if (index == 0) Modifier.focusRequester(first) else Modifier)
+                }
             }
-        }
-        LaunchedEffect(Unit) {
-            withFrameNanos {}
-            runCatching { first.requestFocus() }
+            LaunchedEffect(Unit) {
+                withFrameNanos {}
+                runCatching { first.requestFocus() }
+            }
         }
     }
 }
@@ -667,7 +689,7 @@ private fun Modifier.ignoreHeldOk(): Modifier {
 private fun MenuItem(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.pointer(onClick).fillMaxWidth(),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Raised,
