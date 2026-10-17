@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package tv.ladrok.launcher
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -11,7 +12,12 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 
 /**
@@ -42,19 +48,48 @@ fun Modifier.pointer(onClick: () -> Unit, onLongClick: (() -> Unit)? = null): Mo
             }
         }
         .pointerInput(hasLongClick) {
-            // The item's own click handling, if it has any, runs first and consumes the press: then this sees nothing.
-            detectTapGestures(
-                onTap = { runCatching { focus.requestFocus() }; click() },
-                onLongPress = if (hasLongClick) ({ runCatching { focus.requestFocus() }; longClick?.invoke() }) else null,
+            clicks(
+                onClick = { runCatching { focus.requestFocus() }; click() },
+                onLongClick = if (hasLongClick) ({ runCatching { focus.requestFocus() }; longClick?.invoke() }) else null,
             )
         }
+}
+
+/**
+ * A mouse button pressed and let go on this item is a click; held for the long-press timeout, a long
+ * click. Read on the way in (the Initial pass) and consumed there, so the item inside (a TV Surface,
+ * which reacts to the D-pad, not to a pointer) never gets the chance to swallow the press first.
+ * Touch is left alone.
+ */
+private suspend fun PointerInputScope.clicks(onClick: () -> Unit, onLongClick: (() -> Unit)?) = awaitEachGesture {
+    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+    if (down.type != PointerType.Mouse) return@awaitEachGesture
+    down.consume()
+    // Until the button is let go: true. Past the long-press timeout first: null.
+    val released = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { awaitRelease(down) }
+    when {
+        released == true -> onClick()
+        released == null && onLongClick != null -> { onLongClick(); awaitRelease(down) }
+        released == null -> if (awaitRelease(down)) onClick() // no long click here: a slow click is still a click
+        else -> {} // cancelled
+    }
+}
+
+/** Consumes [down]'s pointer until its button is let go (true) or the press is cancelled (false). */
+private suspend fun AwaitPointerEventScope.awaitRelease(down: PointerInputChange): Boolean {
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        val change = event.changes.firstOrNull { it.id == down.id } ?: return false
+        change.consume()
+        if (!change.pressed) return true
+    }
 }
 
 /** Calls [onTap] on a click without making the item focusable (the arrows never stop on it). */
 @Composable
 fun Modifier.onPointerTap(onTap: () -> Unit): Modifier {
     val tap by rememberUpdatedState(onTap)
-    return pointerInput(Unit) { detectTapGestures(onTap = { tap() }) }
+    return pointerInput(Unit) { clicks(onClick = { tap() }, onLongClick = null) }
 }
 
 /**
