@@ -268,6 +268,15 @@ fun LauncherScreen(
                     true
                 },
         ) {
+            // The frame: a thin light rounded outline around the screen, as around the pictures on ladrok.com.
+            // Behind everything, so a focused Tile's outline stays on top; inset to stay clear of overscan.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(FRAME_INSET)
+                    .border(1.dp, Line, RoundedCornerShape(12.dp)),
+            )
             Column(
                 Modifier
                     .fillMaxSize()
@@ -464,6 +473,9 @@ fun LauncherScreen(
 /** The last cell (0–8) that has a Tile on [page]. */
 private fun lastCellOn(page: Int, tiles: Int) =
     (tiles - 1 - page * Keypad.PER_PAGE).coerceIn(0, Keypad.PER_PAGE - 1)
+
+/** How far the frame sits in from the screen's edges. */
+private val FRAME_INSET = 16.dp
 
 /** How much of the screen fades while a Tile's menu is open: all but that Tile. */
 private const val DIMMED = 0.35f
